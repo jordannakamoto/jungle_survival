@@ -21,22 +21,28 @@ pub fn player_movement(
     // Horizontal input
     player.vx = game_input.movement.x * PLAYER_SPEED;
 
+    // Debug movement
+    if game_input.movement.x != 0.0 {
+        println!("Movement - input.x: {}, vx: {}, dt: {}, player.x: {}",
+            game_input.movement.x, player.vx, dt, player.x);
+    }
+
     // Apply velocities
-    let new_x = player.x as f32 + player.vx * dt;
-    let new_y = player.y as f32 + player.vy * dt;
+    let new_x = player.x + player.vx * dt;
+    let new_y = player.y + player.vy * dt;
 
     // Horizontal collision detection
-    let mut final_x = new_x as i32;
-    let can_move_x = check_horizontal_collision(&world, &player, final_x);
+    let mut final_x = new_x;
+    let can_move_x = check_horizontal_collision(&world, &player, new_x as i32);
     if !can_move_x {
         final_x = player.x;
         player.vx = 0.0;
     }
 
     // Vertical collision detection
-    let mut final_y = new_y as i32;
-    let ground_collision = check_ground_collision(&world, &player, final_x, final_y);
-    let ceiling_collision = check_ceiling_collision(&world, &player, final_x, final_y);
+    let mut final_y = new_y;
+    let ground_collision = check_ground_collision(&world, &player, final_x as i32, new_y as i32);
+    let ceiling_collision = check_ceiling_collision(&world, &player, final_x as i32, new_y as i32);
 
     if ground_collision {
         // On ground - stop falling
@@ -61,7 +67,7 @@ pub fn player_movement(
 fn check_horizontal_collision(world: &PixelWorld, player: &Player, new_x: i32) -> bool {
     // Only collide with ground (dirt) - can pass through trees and sand
     for dy in 0..player.height {
-        let check_y = player.y + dy - player.height / 2;
+        let check_y = player.y as i32 + dy - player.height / 2;
 
         // Left side
         if world.get(new_x - player.width / 2 - 1, check_y) == Material::Dirt {

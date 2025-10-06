@@ -10,8 +10,8 @@ pub fn detect_floating_chunks(
     mut world: ResMut<PixelWorld>,
     time: Res<Time>,
 ) {
-    // Only check every 0.5 seconds to avoid performance issues
-    if time.elapsed_secs() % 0.5 > 0.1 {
+    // Check more frequently for faster response (every 0.1 seconds)
+    if time.elapsed_secs() % 0.1 > 0.02 {
         return;
     }
 
@@ -200,12 +200,12 @@ fn spawn_wood_chunk(
             linvel: initial_torque,
             angvel: angular_velocity,
         },
-        GravityScale(2.0),
+        GravityScale(5.0),  // Increased gravity for faster falling
         Restitution::coefficient(0.3),
         Friction::coefficient(0.8),
         Damping {
             linear_damping: 0.1,
-            angular_damping: 0.5,
+            angular_damping: 0.8,  // More damping to prevent excessive spinning
         },
         WoodChunk {
             pixels: pixels.clone(),

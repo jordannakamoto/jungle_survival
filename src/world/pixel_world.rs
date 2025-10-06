@@ -112,9 +112,9 @@ pub fn update_pixels(mut world: ResMut<PixelWorld>, time: Res<Time>) {
     let width = world.width;
     let height = world.height;
 
-    // Update at fixed rate (30 times per second) instead of every frame
+    // Update at fixed rate (60 times per second) for smooth physics
     world.update_timer += time.delta_secs();
-    if world.update_timer < 1.0 / 30.0 {
+    if world.update_timer < 1.0 / 60.0 {
         return;
     }
     world.update_timer = 0.0;

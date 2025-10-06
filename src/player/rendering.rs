@@ -9,8 +9,8 @@ pub fn render_player(
     let player_height = player.height as f32;
 
     // Convert pixel coordinates to world coordinates
-    let px = player.x as f32 - 400.0;
-    let py = 300.0 - player.y as f32;
+    let px = player.x - 400.0;
+    let py = 300.0 - player.y;
 
     gizmos.rect_2d(
         Isometry2d::new(Vec2::new(px, py), Rot2::IDENTITY),
