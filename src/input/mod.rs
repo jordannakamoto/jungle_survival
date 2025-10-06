@@ -30,18 +30,18 @@ fn update_game_input(
     mut game_input: ResMut<GameInput>,
     mut mouse_motion: EventReader<bevy::input::mouse::MouseMotion>,
 ) {
-    // Movement input (WASD)
+    // Movement input (Arrow keys)
     let mut movement = Vec2::ZERO;
-    if keyboard.pressed(KeyCode::KeyW) {
+    if keyboard.pressed(KeyCode::ArrowUp) {
         movement.y += 1.0;
     }
-    if keyboard.pressed(KeyCode::KeyS) {
+    if keyboard.pressed(KeyCode::ArrowDown) {
         movement.y -= 1.0;
     }
-    if keyboard.pressed(KeyCode::KeyA) {
+    if keyboard.pressed(KeyCode::ArrowLeft) {
         movement.x -= 1.0;
     }
-    if keyboard.pressed(KeyCode::KeyD) {
+    if keyboard.pressed(KeyCode::ArrowRight) {
         movement.x += 1.0;
     }
     game_input.movement = movement.normalize_or_zero();
