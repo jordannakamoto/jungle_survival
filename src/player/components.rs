@@ -13,7 +13,7 @@ pub struct Player {
 impl Default for Player {
     fn default() -> Self {
         Self {
-            x: 400,
+            x: 200,  // Spawn away from sand pile at x=400
             y: 500,
             vx: 0.0,
             vy: 0.0,
