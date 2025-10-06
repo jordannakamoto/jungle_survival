@@ -1,0 +1,17 @@
+[package]
+name = "jungle_survival"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = "0.16"
+bevy_rapier2d = { version = "0.31.0", features = ["debug-render-2d"] }
+rand = "0.8"
+noise = "0.9"
+
+# Enable fast compiles for quick iteration
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
