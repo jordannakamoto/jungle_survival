@@ -68,8 +68,8 @@ fn check_horizontal_collision(world: &PixelWorld, player: &Player, new_x: i32) -
             return false;
         }
 
-        // Right side
-        if world.get(new_x + player.width / 2, check_y) == Material::Dirt {
+        // Right side (symmetric with left)
+        if world.get(new_x + player.width / 2 + 1, check_y) == Material::Dirt {
             return false;
         }
     }
