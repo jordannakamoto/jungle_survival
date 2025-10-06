@@ -110,11 +110,20 @@ pub fn update_pixels(mut world: ResMut<PixelWorld>) {
     let width = world.width;
     let height = world.height;
 
+    // Only update every other frame to reduce CPU usage
+    static mut FRAME_SKIP: u32 = 0;
+    unsafe {
+        FRAME_SKIP += 1;
+        if FRAME_SKIP % 2 != 0 {
+            return;
+        }
+    }
+
     // Create a copy for reading while we write
     let old_pixels = world.pixels.clone();
 
-    // Scan from top to bottom for falling pixels (y=0 is top, sand falls toward y=height)
-    for y in 0..height - 1 {
+    // Scan from bottom to top for better sand settling performance
+    for y in (0..height - 1).rev() {
         for x in 0..width {
             let idx = y * width + x;
             let material = old_pixels[idx];
@@ -157,6 +166,11 @@ pub fn render_pixels(
     let Ok(renderer) = query.single() else {
         return;
     };
+
+    // Only re-render if the world has changed
+    if !world.is_changed() {
+        return;
+    }
 
     if let Some(image) = images.get_mut(&renderer.image_handle) {
         if let Some(data) = &mut image.data {
