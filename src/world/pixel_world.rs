@@ -9,6 +9,7 @@ pub struct PixelWorld {
     pub pixels: Vec<Material>,
     dirty_chunks: Vec<bool>,
     chunk_size: usize,
+    update_timer: f32,
 }
 
 impl PixelWorld {
@@ -22,6 +23,7 @@ impl PixelWorld {
             pixels: vec![Material::Air; width * height],
             dirty_chunks: vec![true; num_chunks],
             chunk_size,
+            update_timer: 0.0,
         }
     }
 
@@ -105,19 +107,17 @@ pub fn setup_renderer(
     ));
 }
 
-pub fn update_pixels(mut world: ResMut<PixelWorld>) {
+pub fn update_pixels(mut world: ResMut<PixelWorld>, time: Res<Time>) {
     let mut rng = rand::thread_rng();
     let width = world.width;
     let height = world.height;
 
-    // Only update every other frame to reduce CPU usage
-    static mut FRAME_SKIP: u32 = 0;
-    unsafe {
-        FRAME_SKIP += 1;
-        if FRAME_SKIP % 2 != 0 {
-            return;
-        }
+    // Update at fixed rate (30 times per second) instead of every frame
+    world.update_timer += time.delta_secs();
+    if world.update_timer < 1.0 / 30.0 {
+        return;
     }
+    world.update_timer = 0.0;
 
     // Create a copy for reading while we write
     let old_pixels = world.pixels.clone();
