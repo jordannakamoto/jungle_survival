@@ -1,49 +1,6 @@
 use bevy::prelude::*;
 use rand::Rng;
-
-pub struct PixelWorldPlugin;
-
-impl Plugin for PixelWorldPlugin {
-    fn build(&self, app: &mut App) {
-        app
-            .insert_resource(PixelWorld::new(800, 600))
-            .add_systems(Startup, setup_pixel_renderer)
-            .add_systems(Update, (update_pixels, render_pixels).chain());
-    }
-}
-
-// Material types for each pixel
-#[derive(Clone, Copy, PartialEq, Debug)]
-pub enum Material {
-    Air,
-    Dirt,
-    Wood,
-    Sand,
-}
-
-impl Material {
-    pub fn color(&self) -> Color {
-        match self {
-            Material::Air => Color::srgba(0.1, 0.1, 0.15, 0.0),
-            Material::Dirt => Color::srgb(0.4, 0.3, 0.2),
-            Material::Wood => Color::srgb(0.5, 0.3, 0.15),
-            Material::Sand => Color::srgb(0.8, 0.7, 0.5),
-        }
-    }
-
-    pub fn is_solid(&self) -> bool {
-        !matches!(self, Material::Air)
-    }
-
-    pub fn density(&self) -> u8 {
-        match self {
-            Material::Air => 0,
-            Material::Sand => 2,
-            Material::Dirt => 3,
-            Material::Wood => 5,
-        }
-    }
-}
+use super::materials::Material;
 
 #[derive(Resource)]
 pub struct PixelWorld {
@@ -117,11 +74,11 @@ impl PixelWorld {
 }
 
 #[derive(Component)]
-struct PixelRenderer {
+pub struct PixelRenderer {
     image_handle: Handle<Image>,
 }
 
-fn setup_pixel_renderer(
+pub fn setup_renderer(
     mut commands: Commands,
     mut images: ResMut<Assets<Image>>,
     world: Res<PixelWorld>,
@@ -148,7 +105,7 @@ fn setup_pixel_renderer(
     ));
 }
 
-fn update_pixels(mut world: ResMut<PixelWorld>) {
+pub fn update_pixels(mut world: ResMut<PixelWorld>) {
     let mut rng = rand::thread_rng();
     let width = world.width;
     let height = world.height;
@@ -192,12 +149,12 @@ fn update_pixels(mut world: ResMut<PixelWorld>) {
     }
 }
 
-fn render_pixels(
+pub fn render_pixels(
     world: Res<PixelWorld>,
     query: Query<&PixelRenderer>,
     mut images: ResMut<Assets<Image>>,
 ) {
-    let Ok(renderer) = query.get_single() else {
+    let Ok(renderer) = query.single() else {
         return;
     };
 

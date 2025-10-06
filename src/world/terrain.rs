@@ -1,16 +1,8 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
-use crate::pixel_world::{PixelWorld, Material};
+use super::{PixelWorld, Material};
 
-pub struct GamePlugin;
-
-impl Plugin for GamePlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup_world);
-    }
-}
-
-fn setup_world(mut commands: Commands, mut world: ResMut<PixelWorld>) {
+pub fn setup_terrain(mut commands: Commands, mut world: ResMut<PixelWorld>) {
     // Create ground from dirt at bottom (y=0 is top, y=600 is bottom)
     world.set_rect(0, 550, 800, 50, Material::Dirt);
 

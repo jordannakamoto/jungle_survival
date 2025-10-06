@@ -1,11 +1,11 @@
 use bevy::prelude::*;
-use crate::pixel_world::{PixelWorld, Material};
+use super::{PixelWorld, Material};
 use crate::input::GameInput;
-use crate::player::Player;
+use crate::player::components::Player;
 
-pub struct TreeChoppingPlugin;
+pub struct DiggingPlugin;
 
-impl Plugin for TreeChoppingPlugin {
+impl Plugin for DiggingPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Update, dig_system);
     }
@@ -15,7 +15,7 @@ impl Plugin for TreeChoppingPlugin {
 fn dig_system(
     _player: Res<Player>,
     mut world: ResMut<PixelWorld>,
-    game_input: Res<GameInput>,
+    _game_input: Res<GameInput>,
     windows: Query<&Window>,
     camera_query: Query<(&Camera, &GlobalTransform)>,
     mouse_buttons: Res<ButtonInput<MouseButton>>,

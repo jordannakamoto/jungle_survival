@@ -1,9 +1,7 @@
 mod input;
-mod pixel_world;
-mod game;
+mod world;
 mod player;
-mod tree_chopping;
-mod chunk_physics;
+mod physics;
 
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
@@ -21,10 +19,9 @@ fn main() {
         .add_plugins(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugins(RapierDebugRenderPlugin::default())
         .add_plugins(input::InputPlugin)
-        .add_plugins(pixel_world::PixelWorldPlugin)
-        .add_plugins(game::GamePlugin)
+        .add_plugins(world::WorldPlugin)
+        .add_plugins(world::digging::DiggingPlugin)
         .add_plugins(player::PlayerPlugin)
-        .add_plugins(tree_chopping::TreeChoppingPlugin)
-        .add_plugins(chunk_physics::ChunkPhysicsPlugin)
+        .add_plugins(physics::PhysicsPlugin)
         .run();
 }
