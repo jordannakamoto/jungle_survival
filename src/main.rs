@@ -2,6 +2,8 @@ mod input;
 mod world;
 mod player;
 mod physics;
+mod tools;
+mod ui;
 
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
@@ -20,8 +22,9 @@ fn main() {
         .add_plugins(RapierDebugRenderPlugin::default())
         .add_plugins(input::InputPlugin)
         .add_plugins(world::WorldPlugin)
-        .add_plugins(world::digging::DiggingPlugin)
         .add_plugins(player::PlayerPlugin)
         .add_plugins(physics::PhysicsPlugin)
+        .add_plugins(tools::ToolsPlugin)
+        .add_plugins(ui::UiPlugin)
         .run();
 }

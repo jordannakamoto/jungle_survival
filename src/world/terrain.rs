@@ -1,18 +1,13 @@
 use bevy::prelude::*;
-use bevy_rapier2d::prelude::*;
 use super::{PixelWorld, Material};
 
-pub fn setup_terrain(mut commands: Commands, mut world: ResMut<PixelWorld>) {
+pub fn setup_terrain(mut world: ResMut<PixelWorld>) {
     // Create ground from dirt at bottom (y=0 is top, y=600 is bottom)
+    // Dirt occupies pixel y from 550 to 600 (50 pixels tall)
     world.set_rect(0, 550, 800, 50, Material::Dirt);
 
-    // Create Rapier collider for ground so rigid bodies can collide with it
-    // Pixel y=550 corresponds to world y = 300 - 550 = -250
-    commands.spawn((
-        Transform::from_xyz(0.0, -250.0, 0.0),
-        Collider::cuboid(400.0, 25.0),
-        RigidBody::Fixed,
-    ));
+    // Ground colliders are now generated dynamically by ground_colliders system
+    // This allows them to update when terrain is dug
 
     // Spawn trees made of wood pixels
     for i in 0..6 {
