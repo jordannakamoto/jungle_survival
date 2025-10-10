@@ -8,7 +8,23 @@ pub struct InteractionPlugin;
 
 impl Plugin for InteractionPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (detect_interactable, chop_tree_system));
+        app
+            .init_resource::<TreeChopCooldown>()
+            .add_systems(Update, (detect_interactable, chop_tree_system));
+    }
+}
+
+/// Cooldown timer for tree chopping to make it take longer
+#[derive(Resource)]
+pub struct TreeChopCooldown {
+    timer: Timer,
+}
+
+impl Default for TreeChopCooldown {
+    fn default() -> Self {
+        Self {
+            timer: Timer::from_seconds(0.5, TimerMode::Repeating), // Chop damage applied twice per second
+        }
     }
 }
 
@@ -79,8 +95,18 @@ fn chop_tree_system(
     mut commands: Commands,
     game_input: Res<GameInput>,
     mut tree_query: Query<(Entity, &mut Tree, &Transform, &Highlighted)>,
+    mut chop_cooldown: ResMut<TreeChopCooldown>,
+    time: Res<Time>,
 ) {
     if !game_input.chop {
+        return;
+    }
+
+    // Update cooldown timer
+    chop_cooldown.timer.tick(time.delta());
+
+    // Only apply damage when timer finishes
+    if !chop_cooldown.timer.just_finished() {
         return;
     }
 

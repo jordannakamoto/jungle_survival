@@ -149,7 +149,7 @@ pub fn update_pixels(mut world: ResMut<PixelWorld>, time: Res<Time>) {
                         }
                     }
                 }
-                Material::Wood | Material::Dirt => {
+                Material::Wood | Material::Dirt | Material::Leaf | Material::Fiber => {
                     // Solid materials don't move
                 }
                 Material::Air => {}

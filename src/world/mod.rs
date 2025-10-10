@@ -3,9 +3,11 @@ pub mod materials;
 pub mod terrain;
 pub mod digging;
 pub mod ground_colliders;
+pub mod particles;
 
 pub use pixel_world::PixelWorld;
 pub use materials::Material;
+pub use particles::{MaterialInteractionParams, spawn_material_particles};
 
 use bevy::prelude::*;
 
@@ -16,6 +18,7 @@ impl Plugin for WorldPlugin {
         app
             .insert_resource(PixelWorld::new(800, 600))
             .init_resource::<ground_colliders::GroundColliderTimer>()
+            .add_plugins(particles::ParticlePlugin)
             .add_systems(Startup, (
                 pixel_world::setup_renderer,
                 terrain::setup_terrain,

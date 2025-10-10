@@ -30,8 +30,11 @@ impl Tool {
 
         match (self, material) {
             (Tool::Axe, Material::Wood) => true,
+            (Tool::Axe, Material::Leaf) => true, // Axe can cut leaves too
+            (Tool::Axe, Material::Fiber) => true, // Axe can harvest fiber bushes
             (Tool::Shovel, Material::Dirt) => true,
             (Tool::Shovel, Material::Sand) => true,
+            (Tool::Hand, Material::Fiber) => true, // Can pick fiber by hand
             _ => false,
         }
     }

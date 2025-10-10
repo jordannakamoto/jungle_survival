@@ -12,6 +12,8 @@ impl Plugin for ToolsPlugin {
         app
             .init_resource::<components::CurrentTool>()
             .init_resource::<components::GrabbedChunk>()
+            .init_resource::<usage::ParticleSpawnTimer>()
+            .init_resource::<usage::BlockBreakTimer>()
             .add_systems(Update, (
                 switching::handle_tool_switching,
                 usage::use_tool,
