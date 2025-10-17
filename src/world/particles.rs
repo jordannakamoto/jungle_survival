@@ -6,8 +6,21 @@ pub struct ParticlePlugin;
 
 impl Plugin for ParticlePlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Update, (update_particles, cleanup_dead_particles));
+        app.add_event::<ParticleSpawnEvent>()
+            .add_systems(Update, (
+                handle_particle_spawn_events,
+                update_particles,
+                cleanup_dead_particles,
+            ));
     }
+}
+
+/// Event for requesting particle spawns
+/// This decouples particle spawning from the systems that trigger them
+#[derive(Event)]
+pub struct ParticleSpawnEvent {
+    pub position: Vec2,
+    pub material: Material,
 }
 
 /// Small visual particle that doesn't interact with physics
@@ -94,6 +107,17 @@ impl MaterialInteractionParams {
             },
             Material::Air => Self::default(),
         }
+    }
+}
+
+/// System that handles particle spawn events
+fn handle_particle_spawn_events(
+    mut commands: Commands,
+    mut events: EventReader<ParticleSpawnEvent>,
+) {
+    for event in events.read() {
+        let params = MaterialInteractionParams::for_material(event.material);
+        spawn_material_particles(&mut commands, event.position, event.material, &params);
     }
 }
 

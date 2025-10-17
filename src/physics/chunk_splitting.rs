@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
 use super::components::WoodChunk;
+use crate::world::Material;
 use std::collections::{HashSet, VecDeque};
 
 /// Detect when chunks have been split and create new rigid bodies for disconnected pieces
@@ -25,8 +26,8 @@ pub fn detect_split_chunks(
         if components.len() > 1 {
             // Calculate the original chunk's center of mass (before split)
             let original_pixels = &chunk.pixels;
-            let sum_x: i32 = original_pixels.iter().map(|(x, _)| x).sum();
-            let sum_y: i32 = original_pixels.iter().map(|(_, y)| y).sum();
+            let sum_x: i32 = original_pixels.iter().map(|(x, _, _)| x).sum();
+            let sum_y: i32 = original_pixels.iter().map(|(_, y, _)| y).sum();
             let count = original_pixels.len() as i32;
             let original_center_x = sum_x / count;
             let original_center_y = sum_y / count;
@@ -58,23 +59,26 @@ pub fn detect_split_chunks(
 }
 
 /// Find connected components using flood fill
-fn find_connected_components(pixels: &[(i32, i32)]) -> Vec<Vec<(i32, i32)>> {
-    let mut pixel_set: HashSet<(i32, i32)> = pixels.iter().copied().collect();
+fn find_connected_components(pixels: &[(i32, i32, Material)]) -> Vec<Vec<(i32, i32, Material)>> {
+    let mut pixel_map: HashSet<(i32, i32)> = pixels.iter().map(|(x, y, _)| (*x, *y)).collect();
+    let mut pixel_materials: std::collections::HashMap<(i32, i32), Material> =
+        pixels.iter().map(|(x, y, m)| ((*x, *y), *m)).collect();
     let mut components = Vec::new();
 
-    while let Some(&start) = pixel_set.iter().next() {
+    while let Some(&start) = pixel_map.iter().next() {
         let mut component = Vec::new();
         let mut queue = VecDeque::new();
         queue.push_back(start);
-        pixel_set.remove(&start);
+        pixel_map.remove(&start);
 
         while let Some((x, y)) = queue.pop_front() {
-            component.push((x, y));
+            let material = pixel_materials.get(&(x, y)).copied().unwrap_or(Material::Air);
+            component.push((x, y, material));
 
             // Check 4-connected neighbors
             for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
                 let neighbor = (x + dx, y + dy);
-                if pixel_set.remove(&neighbor) {
+                if pixel_map.remove(&neighbor) {
                     queue.push_back(neighbor);
                 }
             }
@@ -89,7 +93,7 @@ fn find_connected_components(pixels: &[(i32, i32)]) -> Vec<Vec<(i32, i32)>> {
 /// Spawn a new wood chunk from split pieces
 fn spawn_wood_chunk_from_split(
     commands: &mut Commands,
-    pixels: Vec<(i32, i32)>,
+    pixels: Vec<(i32, i32, Material)>,
     original_pos: Vec3,
     original_rot: Quat,
     original_vel: Velocity,
@@ -101,8 +105,8 @@ fn spawn_wood_chunk_from_split(
     }
 
     // Calculate this piece's center of mass in pixel coordinates
-    let sum_x: i32 = pixels.iter().map(|(x, _)| x).sum();
-    let sum_y: i32 = pixels.iter().map(|(_, y)| y).sum();
+    let sum_x: i32 = pixels.iter().map(|(x, _, _)| x).sum();
+    let sum_y: i32 = pixels.iter().map(|(_, y, _)| y).sum();
     let count = pixels.len() as i32;
     let piece_center_x = sum_x / count;
     let piece_center_y = sum_y / count;
@@ -126,10 +130,10 @@ fn spawn_wood_chunk_from_split(
     );
 
     // Calculate bounding box for collider
-    let min_x = pixels.iter().map(|(x, _)| *x).min().unwrap();
-    let max_x = pixels.iter().map(|(x, _)| *x).max().unwrap();
-    let min_y = pixels.iter().map(|(_, y)| *y).min().unwrap();
-    let max_y = pixels.iter().map(|(_, y)| *y).max().unwrap();
+    let min_x = pixels.iter().map(|(x, _, _)| *x).min().unwrap();
+    let max_x = pixels.iter().map(|(x, _, _)| *x).max().unwrap();
+    let min_y = pixels.iter().map(|(_, y, _)| *y).min().unwrap();
+    let max_y = pixels.iter().map(|(_, y, _)| *y).max().unwrap();
 
     let width = (max_x - min_x + 1) as f32;
     let height = (max_y - min_y + 1) as f32;

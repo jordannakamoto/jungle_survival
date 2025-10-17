@@ -48,87 +48,52 @@ pub fn update_ground_colliders(
 fn generate_ground_colliders(commands: &mut Commands, world: &PixelWorld) {
     let width = world.width as i32;
     let height = world.height as i32;
-    let mut collider_count = 0;
 
     // For each column, find the topmost solid pixel (the surface)
-    // Then group adjacent surface pixels into horizontal segments
-    let mut surface_y: Vec<Option<i32>> = vec![None; width as usize];
+    let mut surface_points: Vec<Vec2> = vec![];
 
-    for x in 0..width {
+    for x in (0..width).step_by(5) {  // Sample every 5 pixels for performance
         // Scan from top to bottom to find first solid pixel
         for y in 0..height {
             if matches!(world.get(x, y), Material::Dirt | Material::Sand) {
-                surface_y[x as usize] = Some(y);
+                // Convert pixel coordinates to world coordinates
+                let world_x = x as f32 - 400.0;
+                let world_y = 300.0 - y as f32;
+                surface_points.push(Vec2::new(world_x, world_y));
                 break;
             }
         }
     }
 
-    // Now create colliders for continuous horizontal segments at the same height
-    let mut segment_start: Option<i32> = None;
-    let mut segment_y: Option<i32> = None;
+    // Create polyline colliders that precisely follow the terrain
+    // Split into segments to avoid single massive collider
+    let max_segment_length = 150;
+    let mut segment_count = 0;
 
-    for x in 0..width {
-        if let Some(y) = surface_y[x as usize] {
-            match (segment_start, segment_y) {
-                (None, None) => {
-                    // Start new segment
-                    segment_start = Some(x);
-                    segment_y = Some(y);
-                }
-                (Some(_), Some(prev_y)) if prev_y == y => {
-                    // Continue segment (same height)
-                    continue;
-                }
-                (Some(start_x), Some(prev_y)) => {
-                    // Height changed, finish previous segment
-                    if x - start_x > 2 { // Minimum width of 2 pixels
-                        create_ground_collider(commands, start_x, x, prev_y);
-                        collider_count += 1;
-                    }
-                    // Start new segment
-                    segment_start = Some(x);
-                    segment_y = Some(y);
-                }
-                _ => {}
-            }
-        } else {
-            // No surface here, finish segment if exists
-            if let (Some(start_x), Some(prev_y)) = (segment_start, segment_y) {
-                if x - start_x > 2 {
-                    create_ground_collider(commands, start_x, x, prev_y);
-                    collider_count += 1;
-                }
-            }
-            segment_start = None;
-            segment_y = None;
+    for chunk_start in (0..surface_points.len()).step_by(max_segment_length) {
+        let chunk_end = (chunk_start + max_segment_length).min(surface_points.len());
+
+        if chunk_end - chunk_start < 2 {
+            continue;
+        }
+
+        let segment = &surface_points[chunk_start..chunk_end];
+
+        // Create a polyline collider from the points
+        let indices: Vec<[u32; 2]> = (0..segment.len() - 1)
+            .map(|i| [i as u32, (i + 1) as u32])
+            .collect();
+
+        if !indices.is_empty() {
+            commands.spawn((
+                Transform::from_xyz(0.0, 0.0, 0.0),
+                Collider::polyline(segment.to_vec(), Some(indices)),
+                RigidBody::Fixed,
+                GroundCollider,
+            ));
+            segment_count += 1;
         }
     }
 
-    // Handle segment that extends to the end
-    if let (Some(start_x), Some(y)) = (segment_start, segment_y) {
-        if width - start_x > 2 {
-            create_ground_collider(commands, start_x, width, y);
-            collider_count += 1;
-        }
-    }
-
-    info!("Generated {} ground colliders", collider_count);
-}
-
-fn create_ground_collider(commands: &mut Commands, start_x: i32, end_x: i32, pixel_y: i32) {
-    let center_x = (start_x + end_x) as f32 / 2.0;
-    let width = (end_x - start_x) as f32;
-
-    // Convert pixel coordinates to world coordinates
-    let world_x = center_x - 400.0;
-    let world_y = 300.0 - pixel_y as f32;
-
-    // Create a thin horizontal collider
-    commands.spawn((
-        Transform::from_xyz(world_x, world_y, 0.0),
-        Collider::cuboid(width / 2.0, 5.0), // 5 pixel half-height
-        RigidBody::Fixed,
-        GroundCollider,
-    ));
+    info!("Generated {} ground colliders with {} surface points", segment_count, surface_points.len());
 }

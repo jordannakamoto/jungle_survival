@@ -1,7 +1,7 @@
 use bevy::prelude::*;
 use rand::Rng;
 use super::components::CurrentTool;
-use crate::world::{PixelWorld, Material, MaterialInteractionParams, spawn_material_particles};
+use crate::world::{PixelWorld, Material, WorldService, ParticleSpawnEvent};
 use crate::physics::components::WoodChunk;
 
 /// Cooldown timer to prevent spawning too many particles
@@ -42,6 +42,7 @@ pub fn use_tool(
     mut chunk_query: Query<(Entity, &Transform, &mut WoodChunk)>,
     mut particle_timer: ResMut<ParticleSpawnTimer>,
     mut break_timer: ResMut<BlockBreakTimer>,
+    mut particle_events: EventWriter<ParticleSpawnEvent>,
     time: Res<Time>,
 ) {
     // Hold left mouse to use tool
@@ -67,14 +68,13 @@ pub fn use_tool(
             if let Ok((camera, camera_transform)) = camera_query.single() {
                 if let Ok(ray) = camera.viewport_to_world(camera_transform, cursor_pos) {
                     let world_pos = ray.origin.truncate();
-                    let pixel_x = (world_pos.x + 400.0) as i32;
-                    let pixel_y = (300.0 - world_pos.y) as i32;
+                    let (pixel_x, pixel_y) = WorldService::world_to_pixel(world_pos);
 
                     // Use tool to break blocks in the pixel world
-                    use_tool_at_position(&mut commands, &mut world, &current_tool.tool, pixel_x, pixel_y, world_pos, should_spawn_particles);
+                    use_tool_at_position(&mut world, &current_tool.tool, pixel_x, pixel_y, should_spawn_particles, &mut particle_events);
 
                     // Also break pixels in wood chunks (felled trees)
-                    use_tool_on_chunks(&mut commands, &current_tool.tool, world_pos, &mut chunk_query, should_spawn_particles);
+                    use_tool_on_chunks(&mut commands, &current_tool.tool, world_pos, &mut chunk_query, should_spawn_particles, &mut particle_events);
                 }
             }
         }
@@ -82,13 +82,12 @@ pub fn use_tool(
 }
 
 fn use_tool_at_position(
-    commands: &mut Commands,
     world: &mut PixelWorld,
     tool: &super::components::Tool,
     x: i32,
     y: i32,
-    _world_pos: Vec2,
     should_spawn_particles: bool,
+    particle_events: &mut EventWriter<ParticleSpawnEvent>,
 ) {
     let mut rng = rand::thread_rng();
 
@@ -112,10 +111,7 @@ fn use_tool_at_position(
 
                     // Collect broken material for particle spawning
                     if should_spawn_particles {
-                        let pixel_world_pos = Vec2::new(
-                            check_x as f32 - 400.0,
-                            300.0 - check_y as f32,
-                        );
+                        let pixel_world_pos = WorldService::pixel_to_world(check_x, check_y);
                         broken_materials.push((material, pixel_world_pos));
                     }
                 }
@@ -131,16 +127,17 @@ fn use_tool_at_position(
             material_groups.entry(material).or_insert_with(Vec::new).push(pos);
         }
 
-        // Spawn particle effects for each material type
+        // Send particle spawn events for each material type
         for (material, positions) in material_groups {
             // Choose 1-2 random positions from this material type to spawn particles (reduced from 2-4)
             let num_particle_spawns = rng.gen_range(1.min(positions.len())..=2.min(positions.len()));
 
-            let params = MaterialInteractionParams::for_material(material);
-
             for _ in 0..num_particle_spawns {
                 if let Some(pos) = positions.get(rng.gen_range(0..positions.len())) {
-                    spawn_material_particles(commands, *pos, material, &params);
+                    particle_events.write(ParticleSpawnEvent {
+                        position: *pos,
+                        material,
+                    });
                 }
             }
         }
@@ -148,11 +145,12 @@ fn use_tool_at_position(
 }
 
 fn use_tool_on_chunks(
-    commands: &mut Commands,
+    _commands: &mut Commands,
     tool: &super::components::Tool,
     world_pos: Vec2,
     chunk_query: &mut Query<(Entity, &Transform, &mut WoodChunk)>,
     should_spawn_particles: bool,
+    particle_events: &mut EventWriter<ParticleSpawnEvent>,
 ) {
     use super::components::Tool;
 
@@ -168,8 +166,8 @@ fn use_tool_on_chunks(
 
     for (_entity, transform, mut chunk) in chunk_query.iter_mut() {
         // Calculate center offset (same as rendering)
-        let sum_x: i32 = chunk.pixels.iter().map(|(x, _)| x).sum();
-        let sum_y: i32 = chunk.pixels.iter().map(|(_, y)| y).sum();
+        let sum_x: i32 = chunk.pixels.iter().map(|(x, _, _)| x).sum();
+        let sum_y: i32 = chunk.pixels.iter().map(|(_, y, _)| y).sum();
         let count = chunk.pixels.len() as i32;
         let center_x = sum_x / count;
         let center_y = sum_y / count;
@@ -183,7 +181,7 @@ fn use_tool_on_chunks(
         let original_len = chunk.pixels.len();
         let mut new_pixels = Vec::new();
 
-        for (px, py) in chunk.pixels.iter() {
+        for (px, py, material) in chunk.pixels.iter() {
             // Transform pixel position to world space (same as rendering)
             let offset_x = (*px - center_x) as f32;
             let offset_y = -(*py - center_y) as f32; // Negative because screen y is flipped
@@ -208,7 +206,7 @@ fn use_tool_on_chunks(
                 }
             } else {
                 // Keep this pixel
-                new_pixels.push((*px, *py));
+                new_pixels.push((*px, *py, *material));
             }
         }
 
@@ -217,13 +215,15 @@ fn use_tool_on_chunks(
         // Spawn particles if we removed any pixels from this chunk
         let removed_count = original_len - chunk.pixels.len();
         if should_spawn_particles && removed_count > 0 {
-            // Spawn particles at 1-2 random removed positions (reduced from 2-4)
+            // Send particle spawn events at 1-2 random removed positions (reduced from 2-4)
             let num_particle_spawns = rng.gen_range(1.min(removed_positions.len())..=2.min(removed_positions.len()));
-            let params = MaterialInteractionParams::for_material(Material::Wood);
 
             for _ in 0..num_particle_spawns {
                 if let Some(pos) = removed_positions.get(rng.gen_range(0..removed_positions.len())) {
-                    spawn_material_particles(commands, *pos, Material::Wood, &params);
+                    particle_events.write(ParticleSpawnEvent {
+                        position: *pos,
+                        material: Material::Wood,
+                    });
                 }
             }
         }

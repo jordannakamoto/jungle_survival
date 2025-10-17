@@ -1,6 +1,7 @@
 use bevy::prelude::*;
 use bevy_rapier2d::prelude::*;
-use crate::world::{PixelWorld, Material};
+use crate::world::{PixelWorld, Material, WorldService};
+use crate::constants::CHUNK_DETECTION_INTERVAL;
 use super::components::WoodChunk;
 use std::collections::{HashSet, VecDeque};
 
@@ -10,8 +11,8 @@ pub fn detect_floating_chunks(
     mut world: ResMut<PixelWorld>,
     time: Res<Time>,
 ) {
-    // Check more frequently for faster response (every 0.1 seconds)
-    if time.elapsed_secs() % 0.1 > 0.02 {
+    // Check more frequently for faster response
+    if time.elapsed_secs() % CHUNK_DETECTION_INTERVAL > 0.02 {
         return;
     }
 
@@ -48,14 +49,16 @@ pub fn detect_floating_chunks(
         }
     }
 
-    // Flood fill to find all grounded wood
+    // Flood fill to find all grounded wood and leaves
     while let Some((x, y)) = to_check.pop_front() {
         for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
             let nx = x + dx;
             let ny = y + dy;
 
             if nx >= 0 && nx < width && ny >= 0 && ny < height {
-                if world.get(nx, ny) == Material::Wood && !grounded.contains(&(nx, ny)) {
+                let material = world.get(nx, ny);
+                // Include both wood and leaves in the grounded check
+                if (material == Material::Wood || material == Material::Leaf) && !grounded.contains(&(nx, ny)) {
                     grounded.insert((nx, ny));
                     to_check.push_back((nx, ny));
                 }
@@ -63,17 +66,18 @@ pub fn detect_floating_chunks(
         }
     }
 
-    // Find floating wood chunks
+    // Find floating wood chunks (including attached leaves)
     let mut visited = HashSet::new();
     let mut chunks_to_spawn = Vec::new();
 
     for y in 0..height {
         for x in 0..width {
-            if world.get(x, y) == Material::Wood
+            let material = world.get(x, y);
+            if (material == Material::Wood || material == Material::Leaf)
                 && !grounded.contains(&(x, y))
                 && !visited.contains(&(x, y))
             {
-                // Found a floating chunk - flood fill to get all connected pixels
+                // Found a floating chunk - flood fill to get all connected pixels (wood + leaves)
                 let chunk_pixels = flood_fill_chunk(&world, x, y, &mut visited);
 
                 if chunk_pixels.len() >= 5 {
@@ -95,7 +99,7 @@ fn flood_fill_chunk(
     start_x: i32,
     start_y: i32,
     visited: &mut HashSet<(i32, i32)>,
-) -> Vec<(i32, i32)> {
+) -> Vec<(i32, i32, Material)> {
     let mut chunk = Vec::new();
     let mut to_check = VecDeque::new();
 
@@ -103,13 +107,16 @@ fn flood_fill_chunk(
     visited.insert((start_x, start_y));
 
     while let Some((x, y)) = to_check.pop_front() {
-        chunk.push((x, y));
+        let material = world.get(x, y);
+        chunk.push((x, y, material));
 
         for (dx, dy) in [(-1, 0), (1, 0), (0, -1), (0, 1)] {
             let nx = x + dx;
             let ny = y + dy;
 
-            if world.get(nx, ny) == Material::Wood && !visited.contains(&(nx, ny)) {
+            let neighbor_material = world.get(nx, ny);
+            // Include both wood and leaves in the chunk
+            if (neighbor_material == Material::Wood || neighbor_material == Material::Leaf) && !visited.contains(&(nx, ny)) {
                 visited.insert((nx, ny));
                 to_check.push_back((nx, ny));
             }
@@ -122,29 +129,28 @@ fn flood_fill_chunk(
 fn spawn_wood_chunk(
     commands: &mut Commands,
     world: &mut PixelWorld,
-    pixels: Vec<(i32, i32)>,
+    pixels: Vec<(i32, i32, Material)>,
 ) {
     if pixels.is_empty() {
         return;
     }
 
     // Calculate center of mass
-    let sum_x: i32 = pixels.iter().map(|(x, _)| x).sum();
-    let sum_y: i32 = pixels.iter().map(|(_, y)| y).sum();
+    let sum_x: i32 = pixels.iter().map(|(x, _, _)| x).sum();
+    let sum_y: i32 = pixels.iter().map(|(_, y, _)| y).sum();
     let count = pixels.len() as i32;
     let center_x = sum_x / count;
     let center_y = sum_y / count;
 
     // Convert pixel coordinates to world coordinates
-    let world_x = center_x as f32 - 400.0;
-    let world_y = 300.0 - center_y as f32;
+    let world_pos = WorldService::pixel_to_world(center_x, center_y);
 
     // Create convex hull approximation from pixels for collider
     // For now, use simplified cuboid based on bounding box
-    let min_x = pixels.iter().map(|(x, _)| *x).min().unwrap();
-    let max_x = pixels.iter().map(|(x, _)| *x).max().unwrap();
-    let min_y = pixels.iter().map(|(_, y)| *y).min().unwrap();
-    let max_y = pixels.iter().map(|(_, y)| *y).max().unwrap();
+    let min_x = pixels.iter().map(|(x, _, _)| *x).min().unwrap();
+    let max_x = pixels.iter().map(|(x, _, _)| *x).max().unwrap();
+    let min_y = pixels.iter().map(|(_, y, _)| *y).min().unwrap();
+    let max_y = pixels.iter().map(|(_, y, _)| *y).max().unwrap();
 
     let width = (max_x - min_x + 1) as f32;
     let height = (max_y - min_y + 1) as f32;
@@ -154,14 +160,14 @@ fn spawn_wood_chunk(
 
     // Determine fall direction based on center of mass offset
     let bottom_center_x: i32 = pixels.iter()
-        .filter(|(_, y)| *y > center_y) // Bottom half
-        .map(|(x, _)| x)
-        .sum::<i32>() / pixels.iter().filter(|(_, y)| *y > center_y).count().max(1) as i32;
+        .filter(|(_, y, _)| *y > center_y) // Bottom half
+        .map(|(x, _, _)| x)
+        .sum::<i32>() / pixels.iter().filter(|(_, y, _)| *y > center_y).count().max(1) as i32;
 
     let top_center_x: i32 = pixels.iter()
-        .filter(|(_, y)| *y < center_y) // Top half
-        .map(|(x, _)| x)
-        .sum::<i32>() / pixels.iter().filter(|(_, y)| *y < center_y).count().max(1) as i32;
+        .filter(|(_, y, _)| *y < center_y) // Top half
+        .map(|(x, _, _)| x)
+        .sum::<i32>() / pixels.iter().filter(|(_, y, _)| *y < center_y).count().max(1) as i32;
 
     // Calculate initial angular velocity for realistic tree falling
     let mut angular_velocity = 0.0;
@@ -187,13 +193,13 @@ fn spawn_wood_chunk(
     }
 
     // Remove pixels from pixel world
-    for (x, y) in &pixels {
+    for (x, y, _) in &pixels {
         world.set(*x, *y, Material::Air);
     }
 
     // Spawn rigid body with realistic tree falling physics
     commands.spawn((
-        Transform::from_xyz(world_x, world_y, 1.0),
+        Transform::from_xyz(world_pos.x, world_pos.y, 1.0),
         RigidBody::Dynamic,
         Collider::cuboid(width / 2.0, height / 2.0),
         Velocity {

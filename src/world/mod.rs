@@ -4,19 +4,23 @@ pub mod terrain;
 pub mod digging;
 pub mod ground_colliders;
 pub mod particles;
+pub mod service;
 
 pub use pixel_world::PixelWorld;
 pub use materials::Material;
-pub use particles::{MaterialInteractionParams, spawn_material_particles};
+pub use particles::ParticleSpawnEvent;
+pub use service::WorldService;
 
 use bevy::prelude::*;
+use crate::constants::{WORLD_PIXEL_WIDTH, WORLD_PIXEL_HEIGHT};
 
 pub struct WorldPlugin;
 
 impl Plugin for WorldPlugin {
     fn build(&self, app: &mut App) {
         app
-            .insert_resource(PixelWorld::new(800, 600))
+            .insert_resource(PixelWorld::new(WORLD_PIXEL_WIDTH, WORLD_PIXEL_HEIGHT))
+            .insert_resource(WorldService)
             .init_resource::<ground_colliders::GroundColliderTimer>()
             .add_plugins(particles::ParticlePlugin)
             .add_systems(Startup, (

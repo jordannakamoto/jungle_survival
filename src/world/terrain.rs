@@ -3,17 +3,69 @@ use rand::Rng;
 use super::{PixelWorld, Material};
 
 pub fn setup_terrain(mut world: ResMut<PixelWorld>) {
-    // Create ground from dirt at bottom (y=0 is top, y=600 is bottom)
-    // Dirt occupies pixel y from 550 to 600 (50 pixels tall)
-    world.set_rect(0, 550, 800, 50, Material::Dirt);
+    let mut rng = rand::thread_rng();
+
+    // Create naturally rounded terrain with smooth curves
+    let mut terrain_heights: Vec<i32> = Vec::new();
+
+    // Generate control points for smooth terrain
+    let num_control_points = rng.gen_range(6..=10);
+    let mut control_points: Vec<(i32, i32)> = vec![];
+
+    // Generate random control points
+    for i in 0..=num_control_points {
+        let x = (i * 800 / num_control_points) as i32;
+        let y = rng.gen_range(490..=560);
+        control_points.push((x, y));
+    }
+
+    // Interpolate between control points using cosine interpolation for smooth curves
+    for x in 0..800 {
+        // Find the two control points we're between
+        let mut p0_idx = 0;
+        for i in 0..control_points.len() - 1 {
+            if x >= control_points[i].0 && x < control_points[i + 1].0 {
+                p0_idx = i;
+                break;
+            }
+        }
+
+        let p0 = control_points[p0_idx];
+        let p1 = control_points[(p0_idx + 1).min(control_points.len() - 1)];
+
+        // Cosine interpolation for smooth curves
+        let progress = if p1.0 > p0.0 {
+            (x - p0.0) as f32 / (p1.0 - p0.0) as f32
+        } else {
+            0.0
+        };
+
+        // Cosine interpolation creates smooth S-curve
+        let smooth_progress = (1.0 - (progress * std::f32::consts::PI).cos()) / 2.0;
+        let height = (p0.1 as f32 + (p1.1 - p0.1) as f32 * smooth_progress) as i32;
+
+        terrain_heights.push(height);
+    }
+
+    // Fill terrain from surface down to bottom of screen
+    for x in 0..800 {
+        let surface_y = terrain_heights[x];
+
+        // Fill from surface all the way to the bottom of the screen
+        for y in surface_y..600 {
+            world.set(x as i32, y, Material::Dirt);
+        }
+    }
 
     // Ground colliders are now generated dynamically by ground_colliders system
     // This allows them to update when terrain is dug
 
     // Spawn palm trees with varied sizes
-    let mut rng = rand::thread_rng();
     for i in 0..6 {
         let x = 100 + i * 120;
+
+        // Get ground level at this x position
+        let ground_y = terrain_heights[x as usize];
 
         // Random trunk height (60-120 pixels)
         let trunk_height = rng.gen_range(60..=120);
@@ -21,11 +73,11 @@ pub fn setup_terrain(mut world: ResMut<PixelWorld>) {
         // Random trunk width (8-14 pixels)
         let trunk_width = rng.gen_range(8..=14);
 
-        // Palm trunk - narrower and taller than regular trees
-        world.set_rect(x, 550 - trunk_height, trunk_width, trunk_height, Material::Wood);
+        // Palm trunk - narrower and taller than regular trees, growing from ground
+        world.set_rect(x, ground_y - trunk_height, trunk_width, trunk_height, Material::Wood);
 
         // Palm fronds - simple leaf crown at the top
-        let top_y = 550 - trunk_height;
+        let top_y = ground_y - trunk_height;
         let center_x = x + trunk_width / 2;
 
         // Random frond size (20-30 pixels)
@@ -73,7 +125,7 @@ pub fn setup_terrain(mut world: ResMut<PixelWorld>) {
     // Spawn fiber bushes scattered on the ground
     for _ in 0..15 {
         let bush_x = rng.gen_range(50..750);
-        let bush_y = 550; // Ground level
+        let bush_y = terrain_heights[bush_x as usize]; // Ground level at this position
 
         // Random bush size
         let bush_width = rng.gen_range(15..=25);

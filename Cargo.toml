@@ -6,8 +6,11 @@ edition = "2021"
 [dependencies]
 bevy = "0.16"
 bevy_rapier2d = { version = "0.31.0", features = ["debug-render-2d"] }
+bevy_egui = "0.36"
 rand = "0.8"
 noise = "0.9"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
 
 # Enable fast compiles for quick iteration
 [profile.dev]

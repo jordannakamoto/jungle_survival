@@ -12,10 +12,10 @@ pub fn update_chunk_colliders(
         }
 
         // Recalculate bounding box
-        let min_x = chunk.pixels.iter().map(|(x, _)| *x).min().unwrap();
-        let max_x = chunk.pixels.iter().map(|(x, _)| *x).max().unwrap();
-        let min_y = chunk.pixels.iter().map(|(_, y)| *y).min().unwrap();
-        let max_y = chunk.pixels.iter().map(|(_, y)| *y).max().unwrap();
+        let min_x = chunk.pixels.iter().map(|(x, _, _)| *x).min().unwrap();
+        let max_x = chunk.pixels.iter().map(|(x, _, _)| *x).max().unwrap();
+        let min_y = chunk.pixels.iter().map(|(_, y, _)| *y).min().unwrap();
+        let max_y = chunk.pixels.iter().map(|(_, y, _)| *y).max().unwrap();
 
         let width = (max_x - min_x + 1) as f32;
         let height = (max_y - min_y + 1) as f32;
